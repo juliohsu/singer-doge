@@ -4,6 +4,7 @@
 import torch
 import torch.nn as nn
 import librosa
+import soundfile as sf
 
 from argparse import ArgumentParser
 
@@ -57,10 +58,17 @@ def main(args):
     rvq_model.load_state_dict(torch.load(args.best_rvq_model_dir))
     rvq_model.eval()
     with torch.no_grad():
-        music_quantized, quantized_indices = rvq_model.quantize(music_tensor_data)
+        music_quantized, _ = rvq_model.quantize(music_tensor_data)
     print(
-        f"Quantized Music Audio Data: \n{music_quantized}\n\nMusic Frequencies: \n{music_quantized.shape[1]}\n\nMusic Time Frames: \n{music_quantized.shape[0]}"
+        f"\nQuantized Music Audio Data: \n{music_quantized}\n\nMusic Frequencies: \n{music_quantized.shape[1]}\n\nMusic Time Frames: \n{music_quantized.shape[0]}"
     )
+    music_quantized2 = music_quantized.to("cpu").detach().numpy()
+    music_quantized_spectogram = librosa.amplitude_to_db(music_quantized2).T
+    music_quantized_spectogram_inv = librosa.feature.inverse.mel_to_stft(
+        music_quantized_spectogram, sr=args.sample_rate, n_fft=args.n_fft
+    )
+    music_quantized_griffin = librosa.griffinlim(music_quantized_spectogram_inv)
+    sf.write(args.output_music_dir, music_quantized_griffin, args.sample_rate)
 
 
 if __name__ == "__main__":
